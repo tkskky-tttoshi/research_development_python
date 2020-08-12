@@ -25,12 +25,23 @@ class FileOpperator:
         return csv_dataframe
 
 class MisbehaviorVehiclePreviousDetector:
-    V2V_DISTANCE = 300000
+    V2V_DISTANCE = 300000  #V2V通信の範囲: 300m
     ROAD_WIDTH = 30000
     V2V_DIRECT_DISTANCE = 800000
+
     def __init__(self, files_names, csv_dataframe):
         self.csv_dataframe = csv_dataframe
         self.files_names = files_names
+
+    #東さんの提案手法
+    def previous_proposal_way(self):
+        threshold_number_of_vehicle = 2
+        result_datum = []
+        #1つ目のデータは正しく無いので削除
+        for index in range(1, len(self.csv_dataframe[0])):
+            result_datum.append(self.search_vehicle(index, threshold_number_of_vehicle))
+
+        self.print_result_on_csv(result_datum)
 
     def search_vehicle(self, index, threshold_number_of_vehicle):
         #時刻indexでのなりすましを検知する
@@ -44,33 +55,37 @@ class MisbehaviorVehiclePreviousDetector:
 
         recognized = 0
         not_recognized = 0
-        print("")
-        print("**********************************")
+        #print("")
+        #print("**********************************")
 
         for i in range(number_of_vehicles):
             
+            my_nodeId = self.get_nodeId_from_a_dataframe(i)
             my_sourceNodeId_array = self.get_source_nodeId_array_from_a_dataframe(i, index)
             my_position = self.get_position_from_a_dataframe(i, index)  #`.x`でxを抽出
             my_BS_nodeId = self.get_BS_nodeId_from_a_dataframe(i, index)
             
-            print("============================")
-            print("my_nodeid "+str(i))
-            print("my_position "+str(my_position/1000))
+            #print("============================")
+            #print("my_nodeid "+str(my_nodeId))
+            #print("my_position "+str(my_position/1000))
 
             #なりすましの種類は2種類
             #1. BS 2.周辺車両の台数 3.周辺車両との位置比較
 
             #1. BS
-            if(not self.the_vehicle_exists_within_BS(my_position, my_BS_nodeId)):
-                print("index"+str(index))
-                print("BSでのなりすましが行われています")
+            if not self.the_vehicle_exists_within_BS(my_position, my_BS_nodeId):
+                #print("index"+str(index))
+                #print("BSでのなりすましが行われています")
                 misbehaviored_on_bs = misbehaviored_on_bs + 1
-                #recognized = recognized + 1
+                if self.is_a_misbehavior_vehicle(i, index):
+                    recognized = recognized + 1
+                else:
+                    not_recognized = not_recognized +1
                 continue
 
             #新提案手法のため
-            if(len(my_sourceNodeId_array) == 0):
-                print("周辺車両が存在しません")
+            if len(my_sourceNodeId_array) == 0:
+                #print("周辺車両が存在しません")
                 no_peripheral_vehicles = no_peripheral_vehicles + 1
                 continue
 
@@ -81,70 +96,84 @@ class MisbehaviorVehiclePreviousDetector:
             #    continue
 
             #3. 周辺車両との位置比較
-            number_of_normal_vehicels = 0
+            number_of_normal_vehicles = 0
             number_of_abnormal_vehicle = 0
             for my_sourceNodeId in my_sourceNodeId_array:
-                print("--------------------")
-                print("another_nodeId "+str(my_sourceNodeId))
+                #print("-----------------------")
+                #print("another_nodeId "+str(my_sourceNodeId))
+                #my_sourceNodeIdをNodeIdとするファイルの検索
                 j = [j for j in range(number_of_vehicles)
                      if self.csv_dataframe[j].at[0, "NodeId"] == int(my_sourceNodeId)]
                 another_nodeId_index = j[0]
                 another_position = self.get_position_from_a_dataframe(another_nodeId_index, index)
-                print("another_position "+str(another_position/1000))
-                if(self.two_vehicles_exist_within_V2V_DISTANCE(my_position, another_position)):
-                    print("True!!")
-                    number_of_normal_vehicels = number_of_normal_vehicels + 1
+                #print("another_position "+str(another_position/1000))
+                if self.two_vehicles_exist_within_V2V_DISTANCE(my_position, another_position):
+                   #print("True!!")
+                    number_of_normal_vehicles = number_of_normal_vehicles + 1
                 else:
-                    number_of_abnormal_vehicle = number_of_abnormal_vehicle + 1
-                    print("False...")
+                    #距離が異なる場合
+                    #相手sourceNodeIdから計測した，現車両の距離も範囲を超えている場合，なりすましではないとみなす
 
-            if(number_of_normal_vehicels < threshold_number_of_vehicle):
+                    number_of_abnormal_vehicle = number_of_abnormal_vehicle + 1
+                    #print("False...")
+
+            #必要周辺車両台数よりも下回った場合
+            if number_of_normal_vehicles < threshold_number_of_vehicle:
                 #number_of_normal_vehicles > number_of_abnormal_vehicel　とかも入れた方がいい気する
                 misbehaviored_on_v2v = misbehaviored_on_v2v + 1
-                if(self.is_a_misbehavior_vehicle(i)):
+                if self.is_a_misbehavior_vehicle(i, index):
+                    #print("なりすましを検知")
                     recognized = recognized + 1
                 else:
                     not_recognized = not_recognized + 1
 
 
-
-                #query('NodeId = {0}'.format(my_sourceNodeId_array[0])))]
-
-
             #for another_nodeId in my_sourceNodeId_array:
-        print("")
-        print("index "+str(index))
+        #print("")
+        #print("index "+str(index))
 
-        print("周辺車両なし " + str(no_peripheral_vehicles))
+        #print("周辺車両なし " + str(no_peripheral_vehicles))
         #print("周辺車両たりない " + str(not_enough_vehicles))
 
-        print("Mis on BS " + str(misbehaviored_on_bs))
-        print("Mis on V2V " + str(misbehaviored_on_v2v))
+        #print("Mis on BS " + str(misbehaviored_on_bs))
+        #print("Mis on V2V " + str(misbehaviored_on_v2v))
 
-        print("recognized " + str(recognized))
-        print("NOT recognized " + str(not_recognized))
+        #print("recognized " + str(recognized))
+        #print("NOT recognized " + str(not_recognized))
+
+        #適合率(精度)と再現率
+        if recognized + not_recognized == 0:
+            #必要周辺車両台数を満たしている時，0になる
+            precision = "全ての車両が必要周辺車両台数をみたし，BSでの問題もない"
+            #recallも常に0
+            recall = recognized / 2
+            f_value ="No"
+        else:
+            precision = recognized / (recognized + not_recognized)
+            # 2はなりすまし車両数
+            # 10台の時2
+            # 20台の時2
+            # 40台の時3
+            recall = recognized / 2
+            if precision + recall != 0:
+                f_value = 2 * recall * precision / (recall + precision)
+            else:
+                f_value = "Not Defined"
+
 
         normal_vehicles = number_of_vehicles - misbehaviored_on_v2v - misbehaviored_on_bs
         result_data = [number_of_vehicles, normal_vehicles, misbehaviored_on_bs, no_peripheral_vehicles,
-                       misbehaviored_on_v2v, recognized, not_recognized]
+                       misbehaviored_on_v2v, recognized, not_recognized, precision, recall, f_value]
         return result_data
 
-    #東さんの提案手法
-    def previous_proposal_way(self):
-        threshold_number_of_vehicle = 2
-        result_datum = []
-        for index in range(len(self.csv_dataframe[0])):
-            result_datum.append(self.search_vehicle(index, threshold_number_of_vehicle))
-
-        self.print_result_on_csv(result_datum)
 
     def print_result_on_csv(self, result_datum):
         df = pd.DataFrame(result_datum, columns=["車両数", "通常車両", "BSでのなりすまし車両数", "周辺車両が存在しない車両数",
-                                                 "V2Vでのなりすまし車両数", "正しい認識数", "誤った認識数"])
+                                                 "V2Vでのなりすまし車両数", "正しい認識数", "誤った認識数", "適合率", "再現率", "F値"])
         df.to_csv("previous_proposal_result.csv")
 
-    def is_a_misbehavior_vehicle(self, file_number):
-        return self.csv_dataframe[file_number].loc[0, "is_misbehavior"] == 1
+    def is_a_misbehavior_vehicle(self, file_number, index):
+        return self.csv_dataframe[file_number].loc[index, "is_misbehavior"] == 1
 
     def get_nodeId_from_a_dataframe(self, file_number):
         return self.csv_dataframe[file_number].loc[0,"NodeId"]
@@ -153,19 +182,20 @@ class MisbehaviorVehiclePreviousDetector:
         #BSの位置によってなりすましを検知
         if ( BS_nodeId == 900):
             #第2象限
-            if(my_position.x <= 0 and my_position.y >= 0):
+            #道路の幅30mの誤差をもたすため30000
+            if(my_position.x <= 30000 and my_position.y >= -30000):
                 return True
         elif( BS_nodeId == 901):
             #第3象限
-            if(my_position.x < 0 and my_position.y < 0):
+            if(my_position.x < 30000 and my_position.y < 30000):
                 return True
         elif( BS_nodeId == 902):
             #第4象限
-            if(my_position.x > 0 and my_position.y < 0):
+            if(my_position.x > -30000 and my_position.y < 30000):
                 return True
         elif( BS_nodeId == 903):
             #第1象限
-            if(my_position.x > 0 and my_position.y > 0):
+            if(my_position.x > -30000 and my_position.y > -30000):
                 return True
         return False
 
@@ -196,8 +226,8 @@ class MisbehaviorVehiclePreviousDetector:
 
     def two_vehicles_exist_within_V2V_DISTANCE(self, my_position, another_position):
         if np.linalg.norm(my_position-another_position) < MisbehaviorVehiclePreviousDetector.V2V_DISTANCE:
-            print("Detected Surround")
-            print(np.linalg.norm(my_position-another_position)/1000)
+            #print("Detected Surround")
+            #print(np.linalg.norm(my_position-another_position)/1000)
             return True
         #マンハッタンの場合，以下を考慮してもいい
         #elif (my_position.x-another_position.x <= MisbehaviorVehiclePreviousDetector.ROAD_WIDTH) \
@@ -213,7 +243,7 @@ class MisbehaviorVehiclePreviousDetector:
         #    print(np.linalg.norm(my_position-another_position)/1000)
         #    return True
         else:
-            print(np.linalg.norm(my_position-another_position)/1000)
+            #print(np.linalg.norm(my_position-another_position)/1000)
             return False
 
 
@@ -231,9 +261,11 @@ if __name__ == "__main__":
     #print(previous_detector.get_source_nodeId_array_from_a_dataframe(0, 0))
     #print(previous_detector.get_position_from_a_dataframe(0,0))
 
-    print(previous_detector.files_names)
+    #print(previous_detector.files_names)
     #previous_detector.search_vehicle(5,1)
     #previous_detector.search_vehicle(6,2)
+
+    #実行関数
     previous_detector.previous_proposal_way()
 
 
