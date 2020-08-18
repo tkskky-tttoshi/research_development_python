@@ -25,8 +25,8 @@ class FileOpperator:
         return csv_dataframe
 
 class MisbehaviorVehiclePreviousDetector:
-    V2V_DISTANCE = 300000  #V2V通信の範囲: 300m
-    ROAD_WIDTH = 30000
+    V2V_DISTANCE = 300  #V2V通信の範囲: 300m
+    ROAD_WIDTH = 30
     V2V_DIRECT_DISTANCE = 800000
 
     def __init__(self, files_names, csv_dataframe):
@@ -104,6 +104,9 @@ class MisbehaviorVehiclePreviousDetector:
                 #my_sourceNodeIdをNodeIdとするファイルの検索
                 j = [j for j in range(number_of_vehicles)
                      if self.csv_dataframe[j].at[0, "NodeId"] == int(my_sourceNodeId)]
+                if(len(j) == 0):
+                    print("The SourceNodeId's File Does Not Exist")
+
                 another_nodeId_index = j[0]
                 another_position = self.get_position_from_a_dataframe(another_nodeId_index, index)
                 #print("another_position "+str(another_position/1000))
