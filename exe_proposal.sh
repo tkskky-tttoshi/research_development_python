@@ -3,7 +3,7 @@
 #第一引数にファイル名を使命 must
 #第二引数にフォルダ名 e.g. data_12からなら12
 
-for var in `seq 800 820`
+for var in `seq 802 819`
 do
 	echo $var
 	if [ $# -eq 1 ]; then
