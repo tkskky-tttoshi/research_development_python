@@ -27,7 +27,7 @@ class FileOpperator:
 class MisbehaviorVehiclePreviousDetector:
     V2V_DISTANCE = 300  #V2V通信の範囲: 300m
     ROAD_WIDTH = 30
-    V2V_DIRECT_DISTANCE = 800000
+    V2V_DIRECT_DISTANCE = 800
 
     def __init__(self, files_names, csv_dataframe):
         self.csv_dataframe = csv_dataframe
@@ -35,15 +35,15 @@ class MisbehaviorVehiclePreviousDetector:
 
     #東さんの提案手法
     def previous_proposal_way(self):
-        threshold_number_of_vehicle = 2
         result_datum = []
         #1つ目のデータは正しく無いので削除
         for index in range(1, len(self.csv_dataframe[0])):
-            result_datum.append(self.search_vehicle(index, threshold_number_of_vehicle))
+            print(index)
+            result_datum.append(self.search_vehicle(index))
 
         self.print_result_on_csv(result_datum)
 
-    def search_vehicle(self, index, threshold_number_of_vehicle):
+    def search_vehicle(self, index):
         #時刻indexでのなりすましを検知する
         #必要周辺車両台数はthreshold_number_of_vehicle
 
@@ -53,19 +53,24 @@ class MisbehaviorVehiclePreviousDetector:
         not_enough_vehicles = 0
         number_of_vehicles = len(self.files_names)
 
+        threshold_array = self.set_threshold(index)
+
         recognized = 0
         not_recognized = 0
         #print("")
         #print("**********************************")
 
         for i in range(number_of_vehicles):
-            
+
             my_nodeId = self.get_nodeId_from_a_dataframe(i)
             my_sourceNodeId_array = self.get_source_nodeId_array_from_a_dataframe(i, index)
             my_position = self.get_position_from_a_dataframe(i, index)  #`.x`でxを抽出
-            my_BS_nodeId = self.get_BS_nodeId_from_a_dataframe(i, index)
-            
-            #print("============================")
+            my_bs_nodeId = self.get_bs_nodeId_from_a_dataframe(i, index)
+
+            #どのBsに属すか
+            index_of_threshold = self.get_index_of_bs(my_position)
+
+#print("============================")
             #print("my_nodeid "+str(my_nodeId))
             #print("my_position "+str(my_position/1000))
 
@@ -73,7 +78,7 @@ class MisbehaviorVehiclePreviousDetector:
             #1. BS 2.周辺車両の台数 3.周辺車両との位置比較
 
             #1. BS
-            if not self.the_vehicle_exists_within_BS(my_position, my_BS_nodeId):
+            if not self.the_vehicle_exists_within_bs(my_position, my_bs_nodeId):
                 #print("index"+str(index))
                 #print("BSでのなりすましが行われています")
                 misbehaviored_on_bs = misbehaviored_on_bs + 1
@@ -120,8 +125,11 @@ class MisbehaviorVehiclePreviousDetector:
                     number_of_abnormal_vehicle = number_of_abnormal_vehicle + 1
                     #print("False...")
 
+            #BS内での車両数に応じた閾値の設定
+            threshold_number_of_vehicles = threshold_array[index_of_threshold]
+
             #必要周辺車両台数よりも下回った場合
-            if number_of_normal_vehicles < threshold_number_of_vehicle:
+            if number_of_normal_vehicles < threshold_number_of_vehicles:
                 #number_of_normal_vehicles > number_of_abnormal_vehicel　とかも入れた方がいい気する
                 misbehaviored_on_v2v = misbehaviored_on_v2v + 1
                 if self.is_a_misbehavior_vehicle(i, index):
@@ -149,20 +157,19 @@ class MisbehaviorVehiclePreviousDetector:
             #必要周辺車両台数を満たしている時，0になる
             precision = "全ての車両が必要周辺車両台数をみたし，BSでの問題もない"
             #recallも常に0
-            recall = recognized / 2
+            recall = 0
             f_value ="No"
         else:
             precision = recognized / (recognized + not_recognized)
             # 2はなりすまし車両数
-            # 10台の時2
-            # 20台の時2
-            # 40台の時3
-            recall = recognized / 2
+            # 40台の時1
+            # 100台の時3
+            # 150台の時5
+            recall = recognized / 20
             if precision + recall != 0:
                 f_value = 2 * recall * precision / (recall + precision)
             else:
                 f_value = "Not Defined"
-
 
         normal_vehicles = number_of_vehicles - misbehaviored_on_v2v - misbehaviored_on_bs
         result_data = [number_of_vehicles, normal_vehicles, misbehaviored_on_bs, no_peripheral_vehicles,
@@ -181,26 +188,27 @@ class MisbehaviorVehiclePreviousDetector:
     def get_nodeId_from_a_dataframe(self, file_number):
         return self.csv_dataframe[file_number].loc[0,"NodeId"]
 
-    def the_vehicle_exists_within_BS(self, my_position, BS_nodeId):
+    def the_vehicle_exists_within_bs(self, my_position, bs_nodeId):
         #BSの位置によってなりすましを検知
-        if ( BS_nodeId == 900):
+        if  bs_nodeId == 900:
             #第2象限
             #道路の幅30mの誤差をもたすため30000
-            if(my_position.x <= 30000 and my_position.y >= -30000):
+            if my_position.x <= 30 and my_position.y >= -30:
                 return True
-        elif( BS_nodeId == 901):
+        elif bs_nodeId == 901:
             #第3象限
-            if(my_position.x < 30000 and my_position.y < 30000):
+            if my_position.x <= 30 and my_position.y <= 30:
                 return True
-        elif( BS_nodeId == 902):
+        elif bs_nodeId == 902:
             #第4象限
-            if(my_position.x > -30000 and my_position.y < 30000):
+            if my_position.x >= -30 and my_position.y <= 30:
                 return True
-        elif( BS_nodeId == 903):
+        elif bs_nodeId == 903:
             #第1象限
-            if(my_position.x > -30000 and my_position.y > -30000):
+            if my_position.x >= -30 and my_position.y >= -30:
                 return True
         return False
+
 
     def get_position_from_a_dataframe(self, file_number, index):
         return self.csv_dataframe[file_number].loc[index, "x":"y"]
@@ -214,9 +222,9 @@ class MisbehaviorVehiclePreviousDetector:
         source_nodeId_array = source_nodeId.split()
         return source_nodeId_array
 
-    def get_BS_nodeId_from_a_dataframe(self, file_number, index):
-        BS_nodeId = self.get_one_row_from_a_dataframe(file_number, index).BSNodeId
-        return BS_nodeId
+    def get_bs_nodeId_from_a_dataframe(self, file_number, index):
+        bs_nodeId = self.get_one_row_from_a_dataframe(file_number, index).BSNodeId
+        return bs_nodeId
 
     def get_one_row_from_a_dataframe(self, file_number, index):
         return self.csv_dataframe[file_number].loc[index, :]
@@ -249,15 +257,42 @@ class MisbehaviorVehiclePreviousDetector:
             #print(np.linalg.norm(my_position-another_position)/1000)
             return False
 
+    def get_index_of_bs(self, my_position):
+        #どの基地局に属すか
+        if my_position.x<= 0 and my_position.y >= 0:
+            return 0
+        elif my_position.x <= 0 and my_position.y < 0:
+            return 1
+        elif my_position.x > 0 and my_position.y < 0:
+            return 2
+        elif my_position.x > 0 and my_position.y >= 0:
+            return 3
+
+    def set_threshold(self, index):
+        array_for_threshold = np.zeros(4)
+        #閾値になる割合
+        rate = 0.2
+        for i in range(len(self.files_names)):
+            my_position = self.get_position_from_a_dataframe(i, index)  #`.x`でxを抽出
+            array_for_threshold[self.get_index_of_bs(my_position)] \
+                = array_for_threshold[self.get_index_of_bs(my_position)] + 1
+
+        threshold_array = np.round(rate * array_for_threshold)
+        print(threshold_array)
+        return threshold_array
+
 
 
 if __name__ == "__main__":
+    print("***recallの計算時の分母変更した?***")
     fileoperator = FileOpperator()
     files_names = fileoperator.files_names
     csv_dataframe = fileoperator.csv_dataframe
     #print(fileoperator.csv_dataframe[0])
 
     previous_detector = MisbehaviorVehiclePreviousDetector(files_names, csv_dataframe)
+
+    my_position = []
 
     #print(previous_detector.get_one_row_from_dataframes(0))
     #print("split")
