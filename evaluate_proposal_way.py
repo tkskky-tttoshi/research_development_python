@@ -20,39 +20,52 @@ def get_files_names_from_evaluation_folder():
     return files_names
 
 def evaluate_datum_for_all_files(files_names):
-        csv_dataframe = []
+    # 閾値を0.005
+    threshold_array = [0.02, 0.01, 0.005, 0.0025, 0.001]
+    for threshold in threshold_array:
         result_array=[]
+        data_frame = pd.DataFrame([])
         for (file_name, i) in zip(files_names, range(len(files_names))):
             df = pd.read_csv(file_name)
-            result = evaluate_data_for_file(df)
+            result, series_data = evaluate_data_for_file(df, threshold)
+
+            data_frame[file_name.split("/")[-1]] = series_data
+
             result_dictionary = {"ファイル名":file_name, "なりすましと判断された数":result[0],
                                  "正しい認識数":result[1], "誤った認識数":result[2]}
             result_array.append(result_dictionary)
-        print_result(result_array)
+        data_frame.to_csv("./Result/evaluation_folder/series_{}.csv".format(threshold), mode='a')
+        print_result(result_array, threshold)
 
-def evaluate_data_for_file(df):
-    #閾値を0.005
-    threshold = 0.02
+def evaluate_data_for_file(df, threshold):
+
     #主成分のみ取得
     anomaly_values_array = df["s=1"]
     times_of_anomaly = 0
     correct_recognized = 0
     incorrect_recognized = 0
+    series_data=[]
     for (anomaly_value, i) in zip(anomaly_values_array, range(len(anomaly_values_array))):
+        if (i >= 120 and i < 180) or (i >= 420 and i < 480):
+            if ( threshold <= anomaly_value):
+                series_data.append(1)
+            else:
+                series_data.append(0)
+
         if (threshold <= anomaly_value):
             times_of_anomaly = times_of_anomaly + 1
             #なりすましの時間は120~180，420~480と決めている
-            if (i >= 120 and i < 180) or (i >= 420 and i < 480):
-                correct_recognized = correct_recognized + 1
-            else:
-                incorrect_recognized = incorrect_recognized + 1
+        if (i >= 120 and i < 180) or (i >= 420 and i < 480):
+            correct_recognized = correct_recognized + 1
+        else:
+            incorrect_recognized = incorrect_recognized + 1
 
     #[なりすまし数，正解数, 誤認識数]
-    return [times_of_anomaly, correct_recognized, incorrect_recognized]
+    return [times_of_anomaly, correct_recognized, incorrect_recognized], series_data
 
 
-def print_result(result_array):
-    csv_file = "./Result/evaluation_folder/evaluation.csv"
+def print_result(result_array, threshold):
+    csv_file = "./Result/evaluation_folder/evaluation_{}.csv".format(threshold)
 
     with open(csv_file, "a") as file:
         writer = csv.DictWriter(file, fieldnames=["ファイル名", "なりすましと判断された数", "正しい認識数", "誤った認識数"])
