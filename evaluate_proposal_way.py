@@ -2,10 +2,10 @@ import pandas as pd
 import glob
 import csv
 
-def get_csv_file():
-    file_name = "./Result/result_800_100vehicles/vehicle_800_x_100vehicles.csv"
-    df = pd.read_csv(file_name)
-    return df
+#def get_csv_file():
+#    file_name = "./Result/result_800_100vehicles/vehicle_800_x_100vehicles.csv"
+#    df = pd.read_csv(file_name)
+#    return df
 
 #def split_csv_data(df):
 #    size = 60
@@ -32,7 +32,7 @@ def evaluate_datum_for_all_files(files_names):
 
 def evaluate_data_for_file(df):
     #閾値を0.005
-    threshold = 0.0001
+    threshold = 0.02
     #主成分のみ取得
     anomaly_values_array = df["s=1"]
     times_of_anomaly = 0
