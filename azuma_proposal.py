@@ -165,7 +165,7 @@ class MisbehaviorVehiclePreviousDetector:
             # 40台の時1
             # 100台の時3
             # 150台の時5
-            recall = recognized / 6
+            recall = recognized / 20
             if precision + recall != 0:
                 f_value = 2 * recall * precision / (recall + precision)
             else:
@@ -284,6 +284,7 @@ class MisbehaviorVehiclePreviousDetector:
 
 
 if __name__ == "__main__":
+    print("***recallの計算時の分母変更した?***")
     fileoperator = FileOpperator()
     files_names = fileoperator.files_names
     csv_dataframe = fileoperator.csv_dataframe
