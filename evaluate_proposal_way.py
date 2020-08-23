@@ -55,10 +55,10 @@ def evaluate_data_for_file(df, threshold):
         if (threshold <= anomaly_value):
             times_of_anomaly = times_of_anomaly + 1
             #なりすましの時間は120~180，420~480と決めている
-        if (i >= 120 and i < 180) or (i >= 420 and i < 480):
-            correct_recognized = correct_recognized + 1
-        else:
-            incorrect_recognized = incorrect_recognized + 1
+            if (i >= 120 and i < 180) or (i >= 420 and i < 480):
+                correct_recognized = correct_recognized + 1
+            else:
+                incorrect_recognized = incorrect_recognized + 1
 
     #[なりすまし数，正解数, 誤認識数]
     return [times_of_anomaly, correct_recognized, incorrect_recognized], series_data
