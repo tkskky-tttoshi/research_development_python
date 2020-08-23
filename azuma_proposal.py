@@ -1,6 +1,7 @@
 import glob
 import pandas as pd
 import numpy as np
+import csv
 
 class FileOpperator:
     def __init__(self):
@@ -41,6 +42,7 @@ class MisbehaviorVehiclePreviousDetector:
             print(index)
             result_datum.append(self.search_vehicle(index))
 
+        #結果出力
         self.print_result_on_csv(result_datum)
 
     def search_vehicle(self, index):
@@ -70,6 +72,9 @@ class MisbehaviorVehiclePreviousDetector:
             #どのBsに属すか
             index_of_threshold = self.get_index_of_bs(my_position)
 
+            #なりすましを行っていたら1
+            index_for_print_series = 0
+
 #print("============================")
             #print("my_nodeid "+str(my_nodeId))
             #print("my_position "+str(my_position/1000))
@@ -84,6 +89,7 @@ class MisbehaviorVehiclePreviousDetector:
                 misbehaviored_on_bs = misbehaviored_on_bs + 1
                 if self.is_a_misbehavior_vehicle(i, index):
                     recognized = recognized + 1
+                    index_for_print_series = 1
                 else:
                     not_recognized = not_recognized +1
                 continue
@@ -128,6 +134,7 @@ class MisbehaviorVehiclePreviousDetector:
             #BS内での車両数に応じた閾値の設定
             threshold_number_of_vehicles = threshold_array[index_of_threshold]
 
+
             #必要周辺車両台数よりも下回った場合
             if number_of_normal_vehicles < threshold_number_of_vehicles:
                 #number_of_normal_vehicles > number_of_abnormal_vehicel　とかも入れた方がいい気する
@@ -135,9 +142,12 @@ class MisbehaviorVehiclePreviousDetector:
                 if self.is_a_misbehavior_vehicle(i, index):
                     #print("なりすましを検知")
                     recognized = recognized + 1
+                    index_for_print_series = 1
                 else:
                     not_recognized = not_recognized + 1
 
+            #時間毎のなりすましの結果を出力
+            #self.print_series_result(index,my_nodeId, index_for_print_series)
 
             #for another_nodeId in my_sourceNodeId_array:
         #print("")
@@ -175,6 +185,14 @@ class MisbehaviorVehiclePreviousDetector:
         result_data = [number_of_vehicles, normal_vehicles, misbehaviored_on_bs, no_peripheral_vehicles,
                        misbehaviored_on_v2v, recognized, not_recognized, precision, recall, f_value]
         return result_data
+
+    def print_series_result(self, index, my_nodeId, index_for_print_series):
+        #時間indexで車両iがなりすましを行った場合
+        if my_nodeId >= 800 and my_nodeId < 900:
+            data =[index, my_nodeId, index_for_print_series]
+            with open("series/series{}_data_for_previous.csv".format(my_nodeId), 'a') as f:
+                writer = csv.writer(f)
+                writer.writerow(data)
 
 
     def print_result_on_csv(self, result_datum):
